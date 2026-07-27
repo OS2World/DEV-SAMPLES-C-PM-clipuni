@@ -1,0 +1,31 @@
+# makefile-ow -- Build CLIPUNI.exe with OpenWatcom 2.0 for OS/2
+#
+# Usage:
+#   wmake -f makefile-ow                  build
+#   wmake -f makefile-ow clean            remove build artifacts
+#   wmake -f makefile-ow OS2TK=C:\myTK   override toolkit path
+#
+# Requires:
+#   OpenWatcom 2.0 (wcc386, wlink, wrc) on the PATH
+#   OS/2 Toolkit with uconv.lib (default path: C:\OS2TK\lib\uconv.lib)
+#
+# Output: bin-ow/CLIPUNI.exe
+
+SRC   = src
+OUT   = bin-ow
+OS2TK = C:\OS2TK
+
+all: $(OUT)\CLIPUNI.exe
+
+$(OUT)\CLIPUNI.obj: $(SRC)\clipuni.c $(SRC)\ids.h
+	wcc386 $(SRC)\clipuni.c -I=$(SRC) -bt=os2 -zq -Ot -w3 -fo=$(OUT)\CLIPUNI.obj
+
+$(OUT)\CLIPUNI.res: $(SRC)\clipuni.rc $(SRC)\ids.h
+	wrc -r -I=$(SRC) $(SRC)\clipuni.rc -fo=$(OUT)\CLIPUNI.res
+
+$(OUT)\CLIPUNI.exe: $(OUT)\CLIPUNI.obj $(OUT)\CLIPUNI.res $(SRC)\clipuni-ow.lnk
+	wlink @$(SRC)\clipuni-ow.lnk LIBRARY $(OS2TK)\lib\uconv.lib
+	wrc $(OUT)\CLIPUNI.res $(OUT)\CLIPUNI.exe
+
+clean: .SYMBOLIC
+	rm -f $(OUT)\CLIPUNI.exe $(OUT)\CLIPUNI.obj $(OUT)\CLIPUNI.res $(OUT)\CLIPUNI.map

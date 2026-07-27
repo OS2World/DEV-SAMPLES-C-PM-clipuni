@@ -1,0 +1,6 @@
+SYSTEM os2v2_pm
+NAME bin-ow/CLIPUNI.exe
+FILE bin-ow/CLIPUNI.obj
+OPTION DESCRIPTION '@#OS2World:1.01#@##1## 2026-07-27     ARCAOS-507::::::@@Unicode Clipboard Demonstration'
+OPTION STACK=65536
+OPTION QUIET

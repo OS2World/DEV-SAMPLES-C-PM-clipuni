@@ -1,0 +1,32 @@
+# makefile-gcc -- Build CLIPUNI.exe with GCC/kLIBC for OS/2
+#
+# Usage:
+#   make -f makefile-gcc                  build
+#   make -f makefile-gcc clean            remove build artifacts
+#   make -f makefile-gcc OS2TK=C:\myTK   override toolkit path
+#
+# Requires:
+#   GCC 9.2 (bitwiseworks/kLIBC), wrc (OpenWatcom) on the PATH
+#   EMXOMFLD_TYPE, EMXOMFLD_LINKER, EMXOMFLD_PRELINK set (see compile-gcc.cmd)
+#   OS/2 Toolkit with uconv.lib (default path: C:\OS2TK\lib\uconv.lib)
+#
+# Output: bin-gcc/CLIPUNI.exe
+
+SRC    = src
+OUT    = bin-gcc
+OS2TK  = C:\OS2TK
+
+all: $(OUT)/CLIPUNI.exe
+
+$(OUT)/CLIPUNI.obj: $(SRC)/clipuni.c $(SRC)/ids.h
+	gcc -Wall -Zomf -c -O2 -x c -I$(SRC) -o $@ $<
+
+$(OUT)/CLIPUNI.res: $(SRC)/clipuni.rc $(SRC)/ids.h
+	wrc -r -I$(SRC) $(SRC)/clipuni.rc -fo=$@
+
+$(OUT)/CLIPUNI.exe: $(OUT)/CLIPUNI.obj $(OUT)/CLIPUNI.res $(SRC)/clipuni-gcc.def
+	gcc -Zomf -o $@ $(OUT)/CLIPUNI.obj $(SRC)/clipuni-gcc.def $(OS2TK)\lib\uconv.lib
+	wrc $(OUT)/CLIPUNI.res $@
+
+clean:
+	rm -f $(OUT)/CLIPUNI.exe $(OUT)/CLIPUNI.obj $(OUT)/CLIPUNI.res $(OUT)/CLIPUNI.map

@@ -1,0 +1,5 @@
+NAME          CLIPUNI    WINDOWAPI
+DESCRIPTION   '@#OS2World:1.01#@##1## 2026-07-27     ARCAOS-507::::::@@Unicode Clipboard Demonstration'
+DATA          MULTIPLE
+STACKSIZE     65536
+HEAPSIZE      65536

@@ -1,0 +1,8 @@
+bin-gcc/
+bin-ow/
+*.obj
+*.map
+*.bak
+*.exe
+*.res
+*.log

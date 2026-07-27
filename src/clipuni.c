@@ -13,6 +13,22 @@
  *                                                                           *
  * CLIPUNI, along with its source code, is hereby placed into the public     *
  * domain.  It may freely be used for any purpose, commercial or otherwise.  *
+ *                                                                           *
+ * PM API USED:                                                              *
+ *   WinInitialize, WinCreateMsgQueue, WinRegisterClass, WinCreateStdWindow, *
+ *   WinCreateWindow, WinSubclassWindow, WinSetPresParam,                    *
+ *   WinQuerySystemAtomTable, WinAddAtom, WinDeleteAtom,                     *
+ *   WinGetMsg, WinDispatchMsg, WinDestroyWindow, WinDestroyMsgQueue,        *
+ *   WinTerminate, WinDefWindowProc, WinMessageBox, WinPostMsg,              *
+ *   WinSendDlgItemMsg, WinBeginPaint, WinQueryWindowRect, WinFillRect,      *
+ *   WinSetWindowPos, WinEndPaint, WinWindowFromID, WinSendMsg,              *
+ *   WinOpenClipbrd, WinQueryClipbrdData, WinCloseClipbrd,                  *
+ *   WinEmptyClipbrd, WinSetClipbrdData, WinQueryCp, WinGetLastError         *
+ *                                                                           *
+ * HISTORY:                                                                  *
+ *   Original: Alex Taylor (public domain)                                   *
+ *   2026-07-27  Martin Iturbide  Reorganized to src/, added dual GCC/OW     *
+ *               build, fixed compiler warnings for GCC 9.2 and OW 2.0      *
  *****************************************************************************/
 
 #define INCL_GPI
@@ -34,7 +50,7 @@
 // MACROS
 //
 #define ErrorPopup( text ) \
-    WinMessageBox( HWND_DESKTOP, HWND_DESKTOP, text, "Error", 0, MB_OK | MB_ERROR )
+    WinMessageBox( HWND_DESKTOP, HWND_DESKTOP, (PCSZ)(text), (PCSZ)"Error", 0, MB_OK | MB_ERROR )
 
 
 // FUNCTION DECLARATIONS
@@ -71,24 +87,24 @@ int main( void )
     hmq = WinCreateMsgQueue( hab, 0 );
 
     // Create the UI controls
-    if ( ! WinRegisterClass( hab, szClass, ClientWndProc, CS_SIZEREDRAW, 0 )) return ( 1 );
+    if ( ! WinRegisterClass( hab, (PCSZ)szClass, ClientWndProc, CS_SIZEREDRAW, 0 )) return ( 1 );
     hwndFrame = WinCreateStdWindow( HWND_DESKTOP, WS_VISIBLE, &flStyle,
-                                    szClass, "Unicode Clipboard Demonstration",
+                                    (PCSZ)szClass, (PCSZ)"Unicode Clipboard Demonstration",
                                     0L, NULLHANDLE, ID_MAIN, &hwndClient       );
     if ( ! hwndFrame ) return ( 1 );
 
-    hwndMLE = WinCreateWindow( hwndClient, WC_MLE, "",
+    hwndMLE = WinCreateWindow( hwndClient, WC_MLE, (PCSZ)"",
                                MLS_BORDER | MLS_VSCROLL | MLS_WORDWRAP | WS_VISIBLE,
                                0, 0, 0, 0, hwndClient, HWND_TOP, IDD_MLE, NULL, NULL );
     if ( ! hwndMLE ) return ( 1 );
     pfnMLE = WinSubclassWindow( hwndMLE, SubMLEProc );
     WinSetPresParam( hwndMLE, PP_FONTNAMESIZE,
-                     strlen("10.Monotype Sans Duospace WT J"),
+                     (ULONG)strlen("10.Monotype Sans Duospace WT J"),
                      (PVOID) "10.Monotype Sans Duospace WT J");
 
     // Register the Unicode clipboard format
     hSATbl     = WinQuerySystemAtomTable();
-    cf_Unicode = WinAddAtom( hSATbl, "text/unicode");
+    cf_Unicode = WinAddAtom( hSATbl, (PCSZ)"text/unicode");
 
     // Main program loop
     while ( WinGetMsg( hab, &qmsg, 0, 0, 0 )) WinDispatchMsg( hab, &qmsg );
@@ -128,7 +144,7 @@ MRESULT EXPENTRY ClientWndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
                 // "Edit" menu commands...
                 //
                 case IDM_PASTE:
-                    WinSendDlgItemMsg( hwnd, IDD_MLE, MLM_PASTE, "", 0 );
+                    WinSendDlgItemMsg( hwnd, IDD_MLE, MLM_PASTE, (MPARAM)0, 0 );
                     return (MRESULT) 0;
 
                 case IDM_CUT:
@@ -151,8 +167,8 @@ MRESULT EXPENTRY ClientWndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
                 //
                 case IDM_ABOUT:
                     WinMessageBox( HWND_DESKTOP, hwnd,
-                                   "Unicode Clipboard Demonstration (v1.01)\n\n¸ 2007 Alex Taylor\nReleased to the public domain.",
-                                   "Product Information", 0, MB_OK | MB_MOVEABLE | MB_INFORMATION );
+                                   (PCSZ)"Unicode Clipboard Demonstration (v1.01)\n\n\xa9 2007 Alex Taylor\nReleased to the public domain.",
+                                   (PCSZ)"Product Information", 0, MB_OK | MB_MOVEABLE | MB_INFORMATION );
                     return (MRESULT) 0;
 
 
@@ -177,10 +193,8 @@ MRESULT EXPENTRY ClientWndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
 MRESULT EXPENTRY SubMLEProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
 {
     USHORT  usFlags,
-            usVK,
-            usX, usY;
+            usVK;
     ULONG   ulCopied = 0;
-    POINTL  pts;
 
 
     switch( msg ) {
@@ -235,7 +249,6 @@ MRESULT PaintClient( HWND hwnd )
 {
     HPS         hps;
     RECTL       rcl;
-    POINTL      ptl;
     LONG        x, y, cx, cy;
 
     hps = WinBeginPaint( hwnd, NULLHANDLE, NULLHANDLE );
@@ -274,14 +287,13 @@ ULONG DoPaste( HWND hwndMLE )
                 *psuClipText,               // Unicode text in clipboard
                 *puniC;                     // pointer into psuClipText
     CHAR        szError[ MAX_ERROR ];       // buffer for error messages
-    PSZ         pszClipText,                // plain text in clipboard
-                pszLocalText,               // imported text
-                s;                          // pointer into pszLocalText
+    char        *pszClipText,               // plain text in clipboard
+                *pszLocalText,              // imported text
+                *s;                         // pointer into pszLocalText
     ULONG       ulCP,                       // codepage to be used
                 ulBufLen,                   // length of output buffer
                 ulCopied,                   // number of characters copied
                 ulRC;                       // return code
-    SHORT       sIdx;                       // index of selected list item
 
 
     ulCopied = 0;
@@ -304,7 +316,7 @@ ULONG DoPaste( HWND hwndMLE )
 
                 // Now do the conversion
                 ulBufLen = ( UniStrlen(psuClipText) * 4 ) + 1;
-                pszLocalText = (PSZ) malloc( ulBufLen );
+                pszLocalText = (char *) malloc( ulBufLen );
                 if (( ulRC = UniStrFromUcs( uconv, pszLocalText,
                                             psuClipText, ulBufLen )) == ULS_SUCCESS )
                 {
@@ -314,22 +326,22 @@ ULONG DoPaste( HWND hwndMLE )
                     WinSendMsg( hwndMLE, MLM_INSERT, MPFROMP(pszLocalText), 0 );
                     ulCopied = strlen( pszLocalText );
                 } else {
-                    sprintf( szError, "Error pasting Unicode text:\nUniStrFromUcs() = %08X", ulRC );
+                    sprintf( szError, "Error pasting Unicode text:\nUniStrFromUcs() = %08lX", ulRC );
                     ErrorPopup( szError );
                 }
                 UniFreeUconvObject( uconv );
                 free( pszLocalText );
 
             } else {
-                sprintf( szError, "Error pasting Unicode text:\nUniCreateUconvObject() = %08X", ulRC );
+                sprintf( szError, "Error pasting Unicode text:\nUniCreateUconvObject() = %08lX", ulRC );
                 ErrorPopup( szError );
             }
         }
 
         // ...Plain text otherwise
-        else if (( pszClipText = (PSZ) WinQueryClipbrdData( hab, CF_TEXT )) != NULL ) {
+        else if (( pszClipText = (char *) WinQueryClipbrdData( hab, CF_TEXT )) != NULL ) {
             ulBufLen = strlen(pszClipText) + 1;
-            pszLocalText = (PSZ) malloc( ulBufLen );
+            pszLocalText = (char *) malloc( ulBufLen );
             strcpy( pszLocalText, pszClipText );
             WinSendMsg( hwndMLE, MLM_INSERT, MPFROMP(pszLocalText), 0 );
             ulCopied = strlen( pszLocalText );
@@ -364,26 +376,24 @@ ULONG DoCopyCut( HWND hwndMLE, BOOL fCut )
             *psuShareMem,               // Unicode text in clipboard
             *puniC;                     // pointer into psuCopyText
     CHAR    szError[ MAX_ERROR ];       // buffer for error messages
-    PSZ     pszCopyText,                // exported text
-            pszShareMem,                // plain text in clipboard
-            s;                          // pointer into pszLocalText
+    char    *pszCopyText,               // exported text
+            *pszShareMem;               // plain text in clipboard
     ULONG   ulCP,                       // codepage to be used
             ulBufLen,                   // length of output buffer
+            ulSelected,                 // number of chars in selection
             ulCopied = 0,               // number of characters copied
             ulRC;                       // return code
-    SHORT   sSelected;                  // number of selected characters in MLE
-    BOOL    fRC,                        // boolean return code
-            fUniCopyFailed = FALSE,     // Unicode copy failed
+    BOOL    fUniCopyFailed = FALSE,     // Unicode copy failed
             fTxtCopyFailed = FALSE;     // plain text copy failed
     IPT     ipt1, ipt2;                 // MLE insertion points (for querying selection)
 
 
     // Get the selected text
-    ipt1 = (IPT) WinSendMsg( hwndMLE, MLM_QUERYSEL, MPFROMSHORT(MLFQS_MINSEL), 0 );
-    ipt2 = (IPT) WinSendMsg( hwndMLE, MLM_QUERYSEL, MPFROMSHORT(MLFQS_MAXSEL), 0 );
-    sSelected   = (ULONG) WinSendMsg( hwndMLE, MLM_QUERYFORMATTEXTLENGTH, MPFROMLONG(ipt1), MPFROMLONG(ipt2 - ipt1) );
-    pszCopyText = (PSZ) malloc( sSelected + 1 );
-    ulCopied    = (ULONG) WinSendMsg( hwndMLE, MLM_QUERYSELTEXT, MPFROMP(pszCopyText), 0 );
+    ipt1 = LONGFROMMR( WinSendMsg( hwndMLE, MLM_QUERYSEL, MPFROMSHORT(MLFQS_MINSEL), 0 ));
+    ipt2 = LONGFROMMR( WinSendMsg( hwndMLE, MLM_QUERYSEL, MPFROMSHORT(MLFQS_MAXSEL), 0 ));
+    ulSelected  = (ULONG)LONGFROMMR( WinSendMsg( hwndMLE, MLM_QUERYFORMATTEXTLENGTH, MPFROMLONG(ipt1), MPFROMLONG(ipt2 - ipt1) ));
+    pszCopyText = (char *) malloc( ulSelected + 1 );
+    ulCopied    = (ULONG)LONGFROMMR( WinSendMsg( hwndMLE, MLM_QUERYSELTEXT, MPFROMP(pszCopyText), 0 ));
 
     if ( WinOpenClipbrd(hab) ) {
 
@@ -419,17 +429,17 @@ ULONG DoCopyCut( HWND hwndMLE, BOOL fCut )
                     if ( ! WinSetClipbrdData( hab, (ULONG) psuShareMem,
                                               cf_Unicode, CFI_POINTER  ))
                     {
-                        sprintf( szError, "Error copying Unicode text: WinSetClipbrdData() failed.\nError code: 0x%X\n", WinGetLastError(hab) );
+                        sprintf( szError, "Error copying Unicode text: WinSetClipbrdData() failed.\nError code: 0x%lX\n", WinGetLastError(hab) );
                         ErrorPopup( szError );
                         fUniCopyFailed = TRUE;
                     }
                 } else {
-                    sprintf( szError, "Error copying Unicode text.\nDosAllocSharedMem: 0x%X\n", ulRC );
+                    sprintf( szError, "Error copying Unicode text.\nDosAllocSharedMem: 0x%lX\n", ulRC );
                     ErrorPopup( szError );
                     fUniCopyFailed = TRUE;
                 }
             } else {
-                sprintf( szError, "Error copying Unicode text:\nUniStrToUcs() = %08X", ulRC );
+                sprintf( szError, "Error copying Unicode text:\nUniStrToUcs() = %08lX", ulRC );
                 ErrorPopup( szError );
                 fUniCopyFailed = TRUE;
             }
@@ -438,7 +448,7 @@ ULONG DoCopyCut( HWND hwndMLE, BOOL fCut )
             free( psuCopyText );
 
         } else {
-            sprintf( szError, "Error copying Unicode text:\nUniCreateUconvObject() = %08X", ulRC );
+            sprintf( szError, "Error copying Unicode text:\nUniCreateUconvObject() = %08lX", ulRC );
             ErrorPopup( szError );
             fUniCopyFailed = TRUE;
         }
@@ -453,12 +463,12 @@ ULONG DoCopyCut( HWND hwndMLE, BOOL fCut )
         if ( ulRC == 0 ) {
             strncpy( pszShareMem, pszCopyText, ulBufLen - 1 );
             if ( ! WinSetClipbrdData( hab, (ULONG) pszShareMem, CF_TEXT, CFI_POINTER )) {
-                sprintf( szError, "Error copying plain text: WinSetClipbrdData() failed.\nError code: 0x%X\n", WinGetLastError(hab) );
+                sprintf( szError, "Error copying plain text: WinSetClipbrdData() failed.\nError code: 0x%lX\n", WinGetLastError(hab) );
                 ErrorPopup( szError );
                 fTxtCopyFailed = TRUE;
             }
         } else {
-            sprintf( szError, "Error copying plain text.\nDosAllocSharedMem: 0x%X\n", ulRC );
+            sprintf( szError, "Error copying plain text.\nDosAllocSharedMem: 0x%lX\n", ulRC );
             ErrorPopup( szError );
             fTxtCopyFailed = TRUE;
         }
@@ -479,4 +489,3 @@ ULONG DoCopyCut( HWND hwndMLE, BOOL fCut )
 
     return ( ulCopied );
 }
-
